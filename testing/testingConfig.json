@@ -1,0 +1,18 @@
+{
+    "randSeed": 50,
+    "rowNum": 5,
+    "colNum": 5,
+    "randomWallRemovalPercent": 10,
+    "numItems": 4,
+    "maxWeight": 5,
+    "maxValue": 5,
+    "knapsackCapacity": 10,
+    "knapsackSolver": "recur",
+    "entrances": [[0,-1]],
+    "exits": [[-1,4]],
+    "pathFinder": "TaskC",
+    "solverEntranceIndex": 0,
+    "visualise": false,
+    "mazeFromFile": false,
+    "fileOutput": "testingConfig"
+}
