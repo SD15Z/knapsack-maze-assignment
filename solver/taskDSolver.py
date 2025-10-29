@@ -33,87 +33,67 @@ class TaskDSolver:
         return self.m_knapsack.optimalValue - self.m_cellsExplored
 
     def solveMaze(self, maze: Maze, entrance: Coordinates, exit: Coordinates):
+        """
+        Task D: Exploration under partial observability.
+        The agent explores the maze incrementally, discovering new cells and items.
+        It re-evaluates its knapsack contents dynamically as new treasures appear.
+        """
 
         from collections import deque
 
-        visited = set()
-        queue = deque()
-        queue.append((entrance, []))  # (cell, path to cell)
-
-        max_capacity = self.m_knapsack.capacity
-        current_weight = 0
-        current_value = 0
-        collected_items = []
-
-        while queue:
-            current_cell, path = queue.popleft()
-
-            if current_cell in visited:
-                continue
-
-            visited.add(current_cell)
-            path = path + [current_cell]
-            self.m_solverPath = path
-
-            # Check for item at current cell
-            if current_cell in maze.m_items:
-                item_weight, item_value = maze.m_items[current_cell]
-                if current_weight + item_weight <= max_capacity:
-                    current_weight += item_weight
-                    current_value += item_value
-                    collected_items.append(current_cell)
-
-            # Check if we're at the exit (early stopping if satisfied)
-            if current_cell == exit:
-                break
-
-            # Expand neighbors
-            neighbors = maze.getNeighbors(current_cell)
-            for neighbor in neighbors:
-                if neighbor not in visited:
-                    queue.append((neighbor, path))
-
-        self.m_knapsack.optimalWeight = current_weight
-        self.m_knapsack.optimalValue = current_value
-        self.m_knapsack.optimalCells = collected_items
-        self.m_cellsExplored = len(set(self.m_solverPath))
-        self.m_reward = self.reward()
-
-        """
-        Solution for Task D goes here.
-
-        Be sure to increase self.m_cellsExplored whenever you visit a NEW cell
-        Be sure to increase the knapsack_value whenever you find an item and put it in your knapsack.
-        You may use the maze object to check if a cell you visit has an item
-        maze.m_itemParams can be used to calculate things like predicted reward, etc. But you can only use
-        maze.m_items to check if your current cell contains an item (and if so, what is its weight and value)
-
-        Code in this function will be rigorously tested. An honest but bad solution will still gain quite a few marks.
-        A cheated solution will gain 0 marks for all of Task D.
-        Args:
-            maze: maze object
-            entrance: initial entrance coord
-            exit: exit coord
-
-        Returns: Nothing, but updates variables
-        """
-        # set up initial condition for knapsack. It should be empty
-        self.m_knapsack.optimalCells = []
-        self.m_knapsack.optimalValue = 0
-        self.m_knapsack.optimalWeight = 0
-
-        # get intial knowledge base of the maze items. This is the only occasion we can use maze.m_items
-        # get the number of items in the maze from the paramaters
-        items_in_maze = maze.m_itemParams[0]
-        # calculate total weight in maze form item list
-        maze_item_weight = sum(weight_value[0] for weight_value in maze.m_items.values())
-        # calculate total value in maze from item list
-        maze_item_value = sum(weight_value[1] for weight_value in maze.m_items.values())
-
-        # set up some intitial values for the TaskDSolver object. As you calculate a solution, you will need
-        # to change the solver path and recalculate your reward.
+        # Initialise tracking variables
         self.m_solverPath = []
         self.m_entranceUsed = entrance
         self.m_exitUsed = exit
-        self.m_cellsExplored = len(set(self.m_solverPath))
-        self.m_reward = self.reward()
+        self.m_cellsExplored = 0
+        self.m_knapsack.optimalCells = []
+        self.m_knapsack.optimalWeight = 0
+        self.m_knapsack.optimalValue = 0
+
+        # Parameters
+        max_capacity = self.m_knapsack.capacity
+        known_items = []  # discovered items
+        visited = set()
+        frontier = deque()
+        frontier.append(entrance)
+
+    while frontier:
+        current = frontier.popleft()
+
+        if current in visited:
+            continue
+
+        visited.add(current)
+        self.m_solverPath.append(current)
+        self.m_cellsExplored = len(visited)
+
+        # --- Perception: discover new info around current cell ---
+        for neighbor in maze.getNeighbors(current):
+            if neighbor not in visited and neighbor not in frontier:
+                frontier.append(neighbor)
+
+        # --- Check if current cell contains an item ---
+        if current in maze.m_items:
+            item_weight, item_value = maze.m_items[current]
+
+            # Add newly discovered item to known list (if not already)
+            if current not in [i[0] for i in known_items]:
+                known_items.append((current, item_weight, item_value))
+
+            # Re-run knapsack solver dynamically to decide what to keep
+            selected, total_wt, total_val = self.m_knapsack.dynamicKnapsack(
+                known_items, max_capacity, len(known_items), "testing"
+            )
+
+            self.m_knapsack.optimalCells = selected
+            self.m_knapsack.optimalWeight = total_wt
+            self.m_knapsack.optimalValue = total_val
+
+        # --- Check termination condition ---
+        # Exit if the knapsack is full or exit reached
+        if current == exit or self.m_knapsack.optimalWeight >= max_capacity:
+            break
+
+    # Update reward: total value minus cells explored
+    self.m_reward = self.reward()
+
